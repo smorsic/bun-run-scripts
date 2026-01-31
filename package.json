@@ -1,0 +1,40 @@
+{
+  "name": "bun-run-scripts",
+  "version": "0.1.0-test-publish.3",
+  "description": "A library to run shell commands via the Bun Shell or system shell in series or parallel.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/smorsic/bun-run-scripts.git"
+  },
+  "author": "Scott Morse",
+  "keywords": [
+    "bun",
+    "shell",
+    "command",
+    "scripts",
+    "script",
+    "run",
+    "series",
+    "parallel",
+    "spawn"
+  ],
+  "main": "src/index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/bun": "latest",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "eslint": "^9.39.2",
+    "eslint-plugin-import": "^2.32.0",
+    "globals": "^17.2.0",
+    "prettier": "^3.8.1",
+    "typescript-eslint": "^8.54.0"
+  },
+  "scripts": {
+    "test": "bun test",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  }
+}

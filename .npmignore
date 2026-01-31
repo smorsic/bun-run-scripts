@@ -1,0 +1,4 @@
+tests/
+eslint.config.mjs
+tsconfig.json
+bun.lock
