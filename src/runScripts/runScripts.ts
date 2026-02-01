@@ -1,7 +1,6 @@
 import {
   createAsyncIterableQueue,
   type SimpleAsyncIterable,
-  type Simplify,
 } from "../internal/core";
 import type { OutputChunk } from "./outputChunk";
 import { determineParallelMax, type ParallelMaxValue } from "./parallel";
@@ -124,9 +123,14 @@ export const runScripts = <ScriptMetadata extends object = object>({
         );
 
   let runningScriptCount = 0;
+  const cancelledScriptIndexes: number[] = [];
   let nextScriptIndex = 0;
   const queueScript = (index: number) => {
     if (runningScriptCount >= parallelMax) {
+      return;
+    }
+
+    if (cancelledScriptIndexes.includes(index)) {
       return;
     }
 
@@ -164,7 +168,7 @@ export const runScripts = <ScriptMetadata extends object = object>({
     const scriptExits: Promise<void>[] = [];
 
     let pendingScriptCount = scripts.length;
-    while (pendingScriptCount > 0) {
+    while (pendingScriptCount - cancelledScriptIndexes.length > 0) {
       const { index } = await Promise.race(
         scriptTriggers.map((trigger) => trigger.promise)
       );
@@ -205,7 +209,11 @@ export const runScripts = <ScriptMetadata extends object = object>({
     await handleScriptProcesses();
 
     const scriptExitResults = await Promise.all(
-      scripts.map((_, index) => scriptResults[index]!.result.exit)
+      scripts
+        .map((_, index) => scriptResults[index]?.result.exit)
+        .filter(
+          (exit): exit is Promise<RunScriptExit<ScriptMetadata>> => !!exit
+        )
     );
 
     const endTime = new Date();
@@ -229,11 +237,27 @@ export const runScripts = <ScriptMetadata extends object = object>({
       const { index, exit } = options || {};
 
       if (typeof index === "number") {
-        scriptResults[index]?.result.kill(exit);
+        if (cancelledScriptIndexes.includes(index)) {
+          return;
+        }
+        if (scriptResults[index]) {
+          scriptResults[index].result.kill(exit);
+        } else {
+          cancelledScriptIndexes.push(index);
+        }
       } else {
-        scriptResults.forEach((scriptResult) =>
-          scriptResult?.result?.kill(exit)
-        );
+        const kills = [] as (() => void)[];
+        scriptResults.forEach((_, index) => {
+          if (cancelledScriptIndexes.includes(index)) {
+            return;
+          }
+          if (scriptResults[index]) {
+            kills.push(() => scriptResults[index]!.result.kill(exit));
+          } else {
+            cancelledScriptIndexes.push(index);
+          }
+        });
+        kills.forEach((kill) => kill());
       }
     },
   };

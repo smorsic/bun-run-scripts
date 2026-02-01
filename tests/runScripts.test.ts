@@ -3,7 +3,6 @@ import fs from "fs";
 import { availableParallelism } from "os";
 import path from "path";
 import { test, expect, describe } from "bun:test";
-import { IS_WINDOWS } from "../src/internal/core";
 import { runScripts } from "../src/runScripts";
 
 describe("Run Multiple Scripts", () => {
@@ -90,9 +89,7 @@ describe("Run Multiple Scripts", () => {
           metadata: {
             name: "test-script name 1",
           },
-          command: IS_WINDOWS
-            ? "echo test-script 1 && exit /b 1"
-            : "echo 'test-script 1' && exit 1",
+          command: "echo 'test-script 1' && exit 1",
           workingDirectory: "",
         },
         {
@@ -161,27 +158,21 @@ describe("Run Multiple Scripts", () => {
         metadata: {
           name: "test-script name 1",
         },
-        command: IS_WINDOWS
-          ? "ping 127.0.0.1 -n 3 >nul && echo test-script 1"
-          : "sleep 0.5 && echo test-script 1",
+        command: "sleep 0.5 && echo test-script 1",
         workingDirectory: "",
       },
       {
         metadata: {
           name: "test-script name 2",
         },
-        command: IS_WINDOWS
-          ? "echo test-script 2 && exit /b 2"
-          : "echo 'test-script 2' && exit 2",
+        command: "echo 'test-script 2' && exit 2",
         workingDirectory: "",
       },
       {
         metadata: {
           name: "test-script name 3",
         },
-        command: IS_WINDOWS
-          ? "ping 127.0.0.1 -n 2 >nul && echo test-script 3"
-          : "sleep 0.25 && echo test-script 3",
+        command: "sleep 0.25 && echo test-script 3",
         workingDirectory: "",
       },
     ];
@@ -276,20 +267,11 @@ describe("Run Multiple Scripts", () => {
 
       const createScript = (scriptName: string) => ({
         metadata: { name: scriptName },
-        command: IS_WINDOWS
-          ? `echo test-script ${scriptName} > ${getRunningFile(
-              scriptName
-            )}  && ` +
-            `dir /b ${outputDir} | find /c /v "" && ` +
-            `ping 127.0.0.1 -n 2 -w ${Math.floor(
-              getRandomSleepTime() * 1000
-            )} >nul && ` +
-            `del ${getRunningFile(scriptName)}`
-          : `echo 'test-script ${scriptName}' > ${getRunningFile(
-              scriptName
-            )} && ls ${outputDir} | wc -l && sleep ${getRandomSleepTime()} && rm ${getRunningFile(
-              scriptName
-            )}`,
+        command: `echo 'test-script ${scriptName}' > ${getRunningFile(
+          scriptName
+        )} && ls ${outputDir} | wc -l && sleep ${getRandomSleepTime()} && rm ${getRunningFile(
+          scriptName
+        )}`,
         workingDirectory: "",
       });
 
@@ -386,9 +368,7 @@ describe("Run Multiple Scripts", () => {
         },
         scripts: [
           {
-            command: IS_WINDOWS
-              ? `echo %_BUN_RUN_SCRIPTS_PARALLEL_MAX%`
-              : "echo $_BUN_RUN_SCRIPTS_PARALLEL_MAX",
+            command: "echo $_BUN_RUN_SCRIPTS_PARALLEL_MAX",
             workingDirectory: "",
             env: {
               _BUN_RUN_SCRIPTS_PARALLEL_MAX: max.toString(),
@@ -421,9 +401,7 @@ describe("Run Multiple Scripts", () => {
       parallel: true,
       scripts: [
         {
-          command: IS_WINDOWS
-            ? `echo %_BUN_RUN_SCRIPTS_PARALLEL_MAX%`
-            : "echo $_BUN_RUN_SCRIPTS_PARALLEL_MAX",
+          command: "echo $_BUN_RUN_SCRIPTS_PARALLEL_MAX",
           workingDirectory: "",
         },
       ],
@@ -460,12 +438,12 @@ describe("Run Multiple Scripts", () => {
       durationMs: expect.any(Number),
       scriptResults: [
         {
-          exitCode: IS_WINDOWS ? 1 : 143,
+          exitCode: 143,
           success: false,
           startTimeISO: expect.any(String),
           endTimeISO: expect.any(String),
           durationMs: expect.any(Number),
-          signal: IS_WINDOWS ? null : "SIGTERM",
+          signal: "SIGTERM",
           metadata: { name: "test-script-1" },
         },
         {
@@ -501,21 +479,21 @@ describe("Run Multiple Scripts", () => {
       durationMs: expect.any(Number),
       scriptResults: [
         {
-          exitCode: IS_WINDOWS ? 1 : 129,
+          exitCode: 129,
           success: false,
           startTimeISO: expect.any(String),
           endTimeISO: expect.any(String),
           durationMs: expect.any(Number),
-          signal: IS_WINDOWS ? null : "SIGHUP",
+          signal: "SIGHUP",
           metadata: { name: "test-script-1" },
         },
         {
-          exitCode: IS_WINDOWS ? 1 : 129,
+          exitCode: 129,
           success: false,
           startTimeISO: expect.any(String),
           endTimeISO: expect.any(String),
           durationMs: expect.any(Number),
-          signal: IS_WINDOWS ? null : "SIGHUP",
+          signal: "SIGHUP",
           metadata: { name: "test-script-2" },
         },
       ],
@@ -544,5 +522,51 @@ describe("Run Multiple Scripts", () => {
     await result.summary;
 
     expect(startedCount).toBe(2);
+  });
+
+  test("Run Scripts - kill scripts before they start", async () => {
+    const result = await runScripts({
+      scripts: [
+        { command: "sleep 1", metadata: { name: "test-script-1" } },
+        { command: "sleep 1", metadata: { name: "test-script-2" } },
+        { command: "sleep 1", metadata: { name: "test-script-3" } },
+        { command: "sleep 1", metadata: { name: "test-script-4" } },
+      ],
+      parallel: { max: 2 },
+    });
+
+    result.kill();
+
+    const summary = await result.summary;
+
+    expect(summary).toEqual({
+      totalCount: 2,
+      allSuccess: false,
+      failureCount: 2,
+      successCount: 0,
+      startTimeISO: expect.any(String),
+      endTimeISO: expect.any(String),
+      durationMs: expect.any(Number),
+      scriptResults: [
+        {
+          exitCode: 143,
+          success: false,
+          startTimeISO: expect.any(String),
+          endTimeISO: expect.any(String),
+          durationMs: expect.any(Number),
+          signal: "SIGTERM",
+          metadata: { name: "test-script-1" },
+        },
+        {
+          exitCode: 143,
+          success: false,
+          startTimeISO: expect.any(String),
+          endTimeISO: expect.any(String),
+          durationMs: expect.any(Number),
+          signal: "SIGTERM",
+          metadata: { name: "test-script-2" },
+        },
+      ],
+    });
   });
 });
