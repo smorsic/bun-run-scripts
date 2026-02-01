@@ -522,7 +522,7 @@ describe("Run Multiple Scripts", () => {
     });
   });
 
-  test.only("Run Scripts - onScriptStart callback", async () => {
+  test("Run Scripts - onScriptStart callback", async () => {
     let startedCount = 0;
     const result = await runScripts({
       scripts: [
