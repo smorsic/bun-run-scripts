@@ -32,14 +32,18 @@ describe("Run Multiple Scripts", () => {
 
     let i = 0;
     for await (const {
-      outputChunk: output,
-      metadata: metadata,
+      outputChunk,
+      metadata,
+      subprocess,
+      index,
     } of result.output) {
       expect(metadata.name).toBe(`test-script name ${i + 1}`);
-      expect(output.decode()).toMatch(`test-script ${i + 1}`);
-      expect(output.decode({ stripAnsi: true })).toMatch(
-        `test-script ${i + 1}`,
+      expect(outputChunk.decode()).toMatch(`test-script ${i + 1}`);
+      expect(outputChunk.decode({ stripAnsi: true })).toMatch(
+        `test-script ${i + 1}`
       );
+      expect(subprocess.kill).toBeInstanceOf(Function);
+      expect(index).toBe(i);
       i++;
     }
 
@@ -110,7 +114,7 @@ describe("Run Multiple Scripts", () => {
       expect(metadata.name).toBe(`test-script name ${i + 1}`);
       expect(output.decode()).toMatch(`test-script ${i + 1}`);
       expect(output.decode({ stripAnsi: true })).toMatch(
-        `test-script ${i + 1}`,
+        `test-script ${i + 1}`
       );
       i++;
     }
@@ -197,7 +201,7 @@ describe("Run Multiple Scripts", () => {
       expect(scriptMetadata.name).toBe(`test-script name ${scriptNum}`);
       expect(outputChunk.decode()).toMatch(`test-script ${scriptNum}`);
       expect(outputChunk.decode({ stripAnsi: true })).toMatch(
-        `test-script ${scriptNum}`,
+        `test-script ${scriptNum}`
       );
       i++;
     }
@@ -258,7 +262,7 @@ describe("Run Multiple Scripts", () => {
         __dirname,
         "test-output",
         "run-script-internals-parallel-max",
-        runId,
+        runId
       );
       if (fs.existsSync(outputDir)) {
         fs.rmSync(outputDir, { recursive: true });
@@ -274,17 +278,17 @@ describe("Run Multiple Scripts", () => {
         metadata: { name: scriptName },
         command: IS_WINDOWS
           ? `echo test-script ${scriptName} > ${getRunningFile(
-              scriptName,
+              scriptName
             )}  && ` +
             `dir /b ${outputDir} | find /c /v "" && ` +
             `ping 127.0.0.1 -n 2 -w ${Math.floor(
-              getRandomSleepTime() * 1000,
+              getRandomSleepTime() * 1000
             )} >nul && ` +
             `del ${getRunningFile(scriptName)}`
           : `echo 'test-script ${scriptName}' > ${getRunningFile(
-              scriptName,
+              scriptName
             )} && ls ${outputDir} | wc -l && sleep ${getRandomSleepTime()} && rm ${getRunningFile(
-              scriptName,
+              scriptName
             )}`,
         workingDirectory: "",
       });
@@ -370,7 +374,7 @@ describe("Run Multiple Scripts", () => {
           },
         ],
       });
-    },
+    }
   );
 
   test.each([3, "auto", "unbounded", "100%", "50%"])(
@@ -405,11 +409,11 @@ describe("Run Multiple Scripts", () => {
           expect(envMax).toBe(availableParallelism().toString());
         } else if (max === "50%") {
           expect(envMax).toBe(
-            Math.floor(availableParallelism() * 0.5).toString(),
+            Math.floor(availableParallelism() * 0.5).toString()
           );
         }
       }
-    },
+    }
   );
 
   test("Run Scripts - cyclical default parallel max as 'default' handled as 'auto'", async () => {
@@ -427,7 +431,7 @@ describe("Run Multiple Scripts", () => {
 
     for await (const { outputChunk } of result.output) {
       expect(outputChunk.decode().trim()).toBe(
-        availableParallelism().toString(),
+        availableParallelism().toString()
       );
     }
   });
@@ -516,5 +520,29 @@ describe("Run Multiple Scripts", () => {
         },
       ],
     });
+  });
+
+  test.only("Run Scripts - onScriptStart callback", async () => {
+    let startedCount = 0;
+    const result = await runScripts({
+      scripts: [
+        { command: "sleep 1", metadata: { name: "test-script-1" } },
+        { command: "sleep 1", metadata: { name: "test-script-2" } },
+      ],
+      parallel: true,
+      onScriptStart: (details) => {
+        expect(details.index).toBe(startedCount);
+        expect(details.metadata.name).toBe(`test-script-${startedCount + 1}`);
+        expect(details.exit).toBeInstanceOf(Promise);
+        expect(details.kill).toBeInstanceOf(Function);
+        expect(details.output[Symbol.asyncIterator]).toBeInstanceOf(Function);
+        expect(details.subprocess.kill).toBeInstanceOf(Function);
+        startedCount++;
+      },
+    });
+
+    await result.summary;
+
+    expect(startedCount).toBe(2);
   });
 });

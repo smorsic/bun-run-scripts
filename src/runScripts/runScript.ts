@@ -24,10 +24,16 @@ export type RunScriptExit<ScriptMetadata extends object = object> = {
 };
 
 export type RunScriptResult<ScriptMetadata extends object = object> = {
+  /** An async iterator of output of the script (use for-await syntax to read) */
   output: SimpleAsyncIterable<OutputChunk>;
+  /** The exit details of the script */
   exit: Promise<RunScriptExit<ScriptMetadata>>;
+  /** The metadata passed to the script, will be in the exit details */
   metadata: Partial<ScriptMetadata>;
+  /** Kill the subprocess */
   kill: (exit?: number | NodeJS.Signals) => void;
+  /** The underlying subprocess */
+  subprocess: Bun.Subprocess;
 };
 
 export type RunScriptOptions<ScriptMetadata extends object = object> = {
@@ -55,7 +61,7 @@ export const runScript = <ScriptMetadata extends object = object>({
 
   const { argv, cleanup } = createScriptExecutor(command, shell);
 
-  const proc = Bun.spawn(argv, {
+  const subprocess = Bun.spawn(argv, {
     cwd: workingDirectory || process.cwd(),
     env: {
       ...process.env,
@@ -68,11 +74,11 @@ export const runScript = <ScriptMetadata extends object = object>({
     stdin: "ignore",
   });
 
-  proc.exited.finally(cleanup);
+  subprocess.exited.finally(cleanup);
   async function* pipeOutput(
-    streamName: OutputStreamName,
+    streamName: OutputStreamName
   ): SimpleAsyncIterable<OutputChunk> {
-    const stream = proc[streamName];
+    const stream = subprocess[streamName];
     if (stream) {
       for await (const chunk of stream) {
         yield createOutputChunk(streamName, chunk);
@@ -85,23 +91,26 @@ export const runScript = <ScriptMetadata extends object = object>({
     pipeOutput("stderr"),
   ]);
 
-  const exit = proc.exited.then<RunScriptExit<ScriptMetadata>>((exitCode) => {
-    const endTime = new Date();
-    return {
-      exitCode,
-      signal: proc.signalCode,
-      success: exitCode === 0,
-      startTimeISO: startTime.toISOString(),
-      endTimeISO: endTime.toISOString(),
-      durationMs: endTime.getTime() - startTime.getTime(),
-      metadata,
-    };
-  });
+  const exit = subprocess.exited.then<RunScriptExit<ScriptMetadata>>(
+    (exitCode) => {
+      const endTime = new Date();
+      return {
+        exitCode,
+        signal: subprocess.signalCode,
+        success: exitCode === 0,
+        startTimeISO: startTime.toISOString(),
+        endTimeISO: endTime.toISOString(),
+        durationMs: endTime.getTime() - startTime.getTime(),
+        metadata,
+      };
+    }
+  );
 
   return {
     output,
     exit,
     metadata,
-    kill: (exit) => proc.kill(exit),
+    kill: (exit) => subprocess.kill(exit),
+    subprocess,
   };
 };

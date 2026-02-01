@@ -1,8 +1,8 @@
 # bun-run-scripts
 
-A utility that simplifies running shell commands via Bun in series or parallel, supporting the [Bun Shell](https://bun.com/docs/runtime/shell) and the system shell.
+A utility for running shell commands via Bun in series or parallel, with dynamic support for either the [Bun Shell](https://bun.com/docs/runtime/shell) or the system shell.
 
-This uses no dependencies and is built on top of `Bun.spawn`.
+This uses no dependencies and is simply built on top of `Bun.spawn`.
 
 ## Installation
 
@@ -32,7 +32,7 @@ When `true` is passed, the default parallel max is `"auto"`, meaning the number 
 import { runScript, runScripts } from "bun-run-scripts";
 
 const runSingleScript = async () => {
-  const { output, exit, kill } = await runScript({
+  const { output, exit, kill, subprocess } = await runScript({
     command: "echo 'Hello, world!'",
     workingDirectory: ".", // optional, relative to process.cwd()
     metadata: { myMetadata: "example" }, // optional, metadata to attach to the script
@@ -93,6 +93,10 @@ const runMultipleScripts = async () => {
     // or a percentage of available CPU cores (e.g. "50%").
     parallel: { max: 2 },
     shell: "system",
+    onScriptStart: ({ index, metadata, exit, kill, output, subprocess }) => {
+      // You can use the index passed to the scripts array above to track the script,
+      // and the same data available as the result of runScript is also available.
+    },
   });
 
   // Examples to kill scripts:
@@ -101,13 +105,14 @@ const runMultipleScripts = async () => {
   // kill({ exit: "SIGINT" }); // Kill all script processes with signal SIGINT
 
   // Get one stream of output from all scripts
-  for await (const { outputChunk, metadata, index } of output) {
+  for await (const { outputChunk, metadata, subprocess, index } of output) {
     console.log(outputChunk.raw); // The raw Uint8Array of the output
     console.log(outputChunk.streamName); // The stream name, "stdout" or "stderr"
     console.log(outputChunk.decode()); // The decoded string of the output
     console.log(outputChunk.decode({ stripAnsi: true })); // Can strip ANSI escape codes
     console.log(metadata); // The metadata passed to the script (e.g. { id: "script-1" })
     console.log(index); // The index of the script as it was passed to runScripts
+    console.log(subprocess); // The subprocess of the script
   }
 
   const exitSummary = await summary; // The summary of the script executions

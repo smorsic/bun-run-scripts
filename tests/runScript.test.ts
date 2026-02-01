@@ -13,13 +13,16 @@ describe("Run Single Script", () => {
       env: {},
     });
 
+    // no class exposed, so need to duck type check
+    expect(result.subprocess.kill).toBeInstanceOf(Function);
+
     let outputCount = 0;
     for await (const outputChunk of result.output) {
       expect(outputChunk.raw).toBeInstanceOf(Uint8Array);
       expect(outputChunk.streamName).toBe("stdout");
       expect(outputChunk.decode()).toMatch(`test-script ${outputCount + 1}`);
       expect(outputChunk.decode({ stripAnsi: true })).toMatch(
-        `test-script ${outputCount + 1}`,
+        `test-script ${outputCount + 1}`
       );
       outputCount++;
     }
@@ -34,11 +37,11 @@ describe("Run Single Script", () => {
       metadata: {},
     });
     expect(new Date(exit.startTimeISO).getTime()).toBeLessThanOrEqual(
-      new Date(exit.endTimeISO).getTime(),
+      new Date(exit.endTimeISO).getTime()
     );
     expect(exit.durationMs).toBe(
       new Date(exit.endTimeISO).getTime() -
-        new Date(exit.startTimeISO).getTime(),
+        new Date(exit.startTimeISO).getTime()
     );
     expect(outputCount).toBe(1);
   });
@@ -59,7 +62,7 @@ describe("Run Single Script", () => {
       expect(outputChunk.streamName).toBe("stdout");
       expect(outputChunk.decode()).toMatch(`test-script ${outputCount + 1}`);
       expect(outputChunk.decode({ stripAnsi: true })).toMatch(
-        `test-script ${outputCount + 1}`,
+        `test-script ${outputCount + 1}`
       );
       outputCount++;
     }
@@ -75,11 +78,11 @@ describe("Run Single Script", () => {
     });
 
     expect(new Date(exit.startTimeISO).getTime()).toBeLessThanOrEqual(
-      new Date(exit.endTimeISO).getTime(),
+      new Date(exit.endTimeISO).getTime()
     );
     expect(exit.durationMs).toBe(
       new Date(exit.endTimeISO).getTime() -
-        new Date(exit.startTimeISO).getTime(),
+        new Date(exit.startTimeISO).getTime()
     );
     expect(outputCount).toBe(1);
   });
@@ -127,11 +130,11 @@ describe("Run Single Script", () => {
     for await (const outputChunk of result.output) {
       expect(outputChunk.raw).toBeInstanceOf(Uint8Array);
       expect(outputChunk.streamName).toBe(
-        outputCount === 1 ? "stderr" : "stdout",
+        outputCount === 1 ? "stderr" : "stdout"
       );
       expect(outputChunk.decode()).toMatch(`test-script ${outputCount + 1}`);
       expect(outputChunk.decode({ stripAnsi: true })).toMatch(
-        `test-script ${outputCount + 1}`,
+        `test-script ${outputCount + 1}`
       );
       outputCount++;
     }
@@ -164,7 +167,7 @@ describe("Run Single Script", () => {
       expect(outputChunk.streamName).toBe("stdout");
       expect(outputChunk.decode().trim()).toBe(`test ${testValue}`);
       expect(outputChunk.decode({ stripAnsi: true }).trim()).toBe(
-        `test ${testValue}`,
+        `test ${testValue}`
       );
     }
 
@@ -178,7 +181,7 @@ describe("Run Single Script", () => {
       expect(outputChunk.streamName).toBe("stdout");
       expect(outputChunk.decode().trim()).toBe(`test ${testValue}`);
       expect(outputChunk.decode({ stripAnsi: true }).trim()).toBe(
-        `test ${testValue}`,
+        `test ${testValue}`
       );
     }
   });
@@ -193,7 +196,7 @@ describe("Run Single Script", () => {
       expect(outputChunk.streamName).toBe("stdout");
       expect(outputChunk.decode().trim()).toBe(`\x1b[31mtest-script 1\x1b[0m`);
       expect(outputChunk.decode({ stripAnsi: true }).trim()).toBe(
-        `test-script 1`,
+        `test-script 1`
       );
     }
   });
@@ -210,7 +213,7 @@ describe("Run Single Script", () => {
     for await (const outputChunk of result.output) {
       expect(outputChunk.streamName).toBe("stdout");
       expect(outputChunk.decode().trim()).toMatch(
-        /node_modules\/.bin\/eslint$/,
+        /node_modules\/.bin\/eslint$/
       );
       expect(outputChunk.decode({ stripAnsi: true }).trim()).toMatch(/eslint$/);
     }

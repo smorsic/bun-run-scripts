@@ -1,6 +1,7 @@
 import {
   createAsyncIterableQueue,
   type SimpleAsyncIterable,
+  type Simplify,
 } from "../internal/core";
 import type { OutputChunk } from "./outputChunk";
 import { determineParallelMax, type ParallelMaxValue } from "./parallel";
@@ -38,12 +39,19 @@ export type RunScriptsOutput<ScriptMetadata extends object = object> = {
   metadata: ScriptMetadata;
   /** The index of the script based on the array passed to runScripts */
   index: number;
+  /** The underlying subprocess for the script that produced the output chunk */
+  subprocess: RunScriptResult<ScriptMetadata>["subprocess"];
 };
 
 export type KillOptions = {
   index?: number;
   exit?: number | NodeJS.Signals;
 };
+
+export type OnStartDetails<ScriptMetadata extends object = object> = {
+  /** The index of the script based on the array passed to runScripts */
+  index: number;
+} & RunScriptResult<ScriptMetadata>;
 
 export type RunScriptsResult<ScriptMetadata extends object = object> = {
   /** Allows async iteration of output chunks from all script executions */
@@ -62,6 +70,8 @@ export type RunScriptsOptions<ScriptMetadata extends object = object> = {
   scripts: Omit<RunScriptOptions<ScriptMetadata>, "shell">[];
   parallel?: boolean | RunScriptsParallelOptions;
   shell?: ScriptShellOption;
+  /** Callback when a script starts running */
+  onScriptStart?: (details: OnStartDetails<ScriptMetadata>) => void;
 };
 
 /** Run a list of scripts */
@@ -69,6 +79,7 @@ export const runScripts = <ScriptMetadata extends object = object>({
   scripts,
   parallel = false,
   shell: _shell,
+  onScriptStart,
 }: RunScriptsOptions<ScriptMetadata>): RunScriptsResult<ScriptMetadata> => {
   const startTime = new Date();
 
@@ -102,14 +113,14 @@ export const runScripts = <ScriptMetadata extends object = object>({
     createAsyncIterableQueue<RunScriptsOutput<ScriptMetadata>>();
 
   const scriptResults: RunScriptsScriptResult<ScriptMetadata>[] = scripts.map(
-    () => null as never as RunScriptsScriptResult<ScriptMetadata>,
+    () => null as never as RunScriptsScriptResult<ScriptMetadata>
   );
 
   const parallelMax =
     parallel === false
       ? 1
       : determineParallelMax(
-          typeof parallel === "boolean" ? "auto" : parallel.max,
+          typeof parallel === "boolean" ? "auto" : parallel.max
         );
 
   let runningScriptCount = 0;
@@ -155,13 +166,18 @@ export const runScripts = <ScriptMetadata extends object = object>({
     let pendingScriptCount = scripts.length;
     while (pendingScriptCount > 0) {
       const { index } = await Promise.race(
-        scriptTriggers.map((trigger) => trigger.promise),
+        scriptTriggers.map((trigger) => trigger.promise)
       );
 
       pendingScriptCount--;
 
       scriptTriggers[index]!.promise = new Promise<never>(() => {
         void 0;
+      });
+
+      onScriptStart?.({
+        ...scriptResults[index]!.result,
+        index,
       });
 
       outputReaders.push(
@@ -171,9 +187,10 @@ export const runScripts = <ScriptMetadata extends object = object>({
               outputChunk: chunk,
               metadata: scripts[index]!.metadata || ({} as ScriptMetadata),
               index,
+              subprocess: scriptResults[index]!.result.subprocess,
             });
           }
-        })(),
+        })()
       );
     }
 
@@ -188,7 +205,7 @@ export const runScripts = <ScriptMetadata extends object = object>({
     await handleScriptProcesses();
 
     const scriptExitResults = await Promise.all(
-      scripts.map((_, index) => scriptResults[index]!.result.exit),
+      scripts.map((_, index) => scriptResults[index]!.result.exit)
     );
 
     const endTime = new Date();
@@ -215,7 +232,7 @@ export const runScripts = <ScriptMetadata extends object = object>({
         scriptResults[index]?.result.kill(exit);
       } else {
         scriptResults.forEach((scriptResult) =>
-          scriptResult?.result?.kill(exit),
+          scriptResult?.result?.kill(exit)
         );
       }
     },

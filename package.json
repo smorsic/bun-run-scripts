@@ -1,6 +1,6 @@
 {
   "name": "bun-run-scripts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A library to run shell commands via the Bun Shell or system shell in series or parallel.",
   "license": "MIT",
   "repository": {
